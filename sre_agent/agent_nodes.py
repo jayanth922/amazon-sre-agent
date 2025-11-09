@@ -14,7 +14,8 @@ from langgraph.prebuilt import create_react_agent
 from .agent_state import AgentState
 from .constants import AgentMetadata
 from .llm_utils import create_llm_with_error_handling
-from .memory import SREMemoryClient, create_conversation_memory_manager
+from .memory_oss.client_postgres import SREMemoryClient
+from .memory_oss.conversation import create_conversation_memory_manager
 from .prompt_loader import prompt_loader
 
 # Logging will be configured by the main entry point
@@ -374,7 +375,7 @@ class BaseAgentNode:
             if user_id and agent_response:
                 try:
                     # Check if memory hooks are available through the memory client
-                    from .memory.hooks import MemoryHookProvider
+                    from .memory_oss.hooks import MemoryHookProvider
 
                     # Use the SREMemoryClient that's already imported at the top
                     # Get region from llm_kwargs if available

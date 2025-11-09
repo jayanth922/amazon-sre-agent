@@ -14,11 +14,11 @@ from pydantic import BaseModel, Field, field_validator
 from .agent_state import AgentState
 from .constants import SREConstants
 from .llm_utils import create_llm_with_error_handling
-from .memory import create_conversation_memory_manager
-from .memory.client import SREMemoryClient
-from .memory.config import _load_memory_config
-from .memory.hooks import MemoryHookProvider
-from .memory.tools import create_memory_tools
+from .memory_oss.conversation import create_conversation_memory_manager
+from .memory_oss.client_postgres import SREMemoryClient
+from .memory_oss.config import _load_memory_config
+from .memory_oss.hooks import MemoryHookProvider
+from .memory_oss.tools import create_memory_tools
 from .output_formatter import create_formatter
 from .prompt_loader import prompt_loader
 
@@ -293,7 +293,7 @@ class SupervisorAgent:
 
         # Update memory tools with the current user_id
         if self.memory_tools:
-            from .memory.tools import update_memory_tools_user_id
+            from .memory_oss.tools import update_memory_tools_user_id
 
             update_memory_tools_user_id(self.memory_tools, user_id)
             logger.info(f"Updated memory tools with user_id: {user_id}")

@@ -1,4 +1,4 @@
-from sre_agent.memory.config import MemoryConfig, _load_memory_config
+from sre_agent.memory_oss.config import _load_memory_config
 
 
 class TestMemoryConfig:

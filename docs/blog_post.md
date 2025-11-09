@@ -340,13 +340,13 @@ While AgentCore Gateway provides seamless API access, AgentCore Memory transform
 The SRE Agent memory system is built on Amazon Bedrock AgentCore Memory's event-based model with automatic namespace routing. During initialization, the system creates three memory strategies with specific namespace patterns:
 
 ```python
-from sre_agent.memory.client import SREMemoryClient
-from sre_agent.memory.strategies import create_memory_strategies
+from sre_agent.memory_oss.client_postgres import SREMemoryClient
+# strategies are internal to OSS client; not needed externally
+# from sre_agent.memory_oss.strategies import ...
 
 # Initialize memory client
 memory_client = SREMemoryClient(
-    memory_name="sre_agent_memory", 
-    region="us-east-1"
+    dsn="postgresql+psycopg://sre:sre@localhost:5432/sre_memory"
 )
 
 # Create three specialized memory strategies

@@ -460,9 +460,9 @@ async def create_multi_agent_system(
     # Add memory tools if memory system is enabled
     memory_tools = []
     try:
-        from .memory.client import SREMemoryClient
-        from .memory.config import _load_memory_config
-        from .memory.tools import create_memory_tools
+        from .memory_oss.client_postgres import SREMemoryClient
+        from .memory_oss.config import _load_memory_config
+        from .memory_oss.tools import create_memory_tools
 
         memory_config = _load_memory_config()
         if memory_config.enabled:
