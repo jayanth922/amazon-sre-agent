@@ -14,8 +14,6 @@ from langgraph.prebuilt import create_react_agent
 from .agent_state import AgentState
 from .constants import AgentMetadata
 from .llm_utils import create_llm_with_error_handling
-from .memory_oss.client_postgres import SREMemoryClient
-from .memory_oss.conversation import create_conversation_memory_manager
 from .prompt_loader import prompt_loader
 
 # Logging will be configured by the main entry point
@@ -30,7 +28,7 @@ def _load_agent_config() -> Dict[str, Any]:
         return yaml.safe_load(f)
 
 
-def _create_llm(provider: str = "bedrock", **kwargs):
+def _create_llm(provider: str = "groq", **kwargs):
     """Create LLM instance with improved error handling."""
     return create_llm_with_error_handling(provider, **kwargs)
 
@@ -87,7 +85,7 @@ class BaseAgentNode:
         name: str,
         description: str,
         tools: List[BaseTool],
-        llm_provider: str = "bedrock",
+        llm_provider: str = "groq",
         agent_metadata: AgentMetadata = None,
         **llm_kwargs,
     ):
@@ -172,29 +170,6 @@ class BaseAgentNode:
             # We'll collect all messages and the final response
             all_messages = []
             agent_response = ""
-
-            # Initialize conversation memory manager for automatic message tracking
-            conversation_manager = None
-            user_id = state.get("user_id")
-            if user_id:
-                try:
-                    # Get region from llm_kwargs if available
-                    region = self.llm_kwargs.get("region_name", "us-east-1") if self.llm_provider == "bedrock" else "us-east-1"
-                    memory_client = SREMemoryClient(region=region)
-                    conversation_manager = create_conversation_memory_manager(
-                        memory_client
-                    )
-                    logger.info(
-                        f"{self.name} - Initialized conversation memory manager for user: {user_id}"
-                    )
-                except Exception as e:
-                    logger.warning(
-                        f"{self.name} - Failed to initialize conversation memory manager: {e}"
-                    )
-            else:
-                logger.info(
-                    f"{self.name} - No user_id found in state, skipping conversation memory"
-                )
 
             # Add system prompt and user prompt
             system_message = SystemMessage(content=self._get_system_prompt())
@@ -301,114 +276,6 @@ class BaseAgentNode:
             )
             if agent_response:
                 logger.info(f"{self.name} - Full response: {str(agent_response)}")
-
-            # Store conversation messages in memory after agent response
-            if conversation_manager and user_id and agent_response:
-                try:
-                    # Store the user query and agent response as conversation messages
-                    messages_to_store = [
-                        (agent_prompt, "USER"),
-                        (
-                            f"[Agent: {self.name}]\n{agent_response}",
-                            "ASSISTANT",
-                        ),  # Include agent name in message content
-                    ]
-
-                    # Also capture tool execution results as TOOL messages
-                    tool_names = []
-                    for msg in all_messages:
-                        if hasattr(msg, "tool_call_id") and hasattr(msg, "content"):
-                            tool_content = str(msg.content)[
-                                :500
-                            ]  # Limit tool message length
-                            tool_name = getattr(msg, "name", "unknown")
-                            tool_names.append(tool_name)
-                            messages_to_store.append(
-                                (
-                                    f"[Agent: {self.name}] [Tool: {tool_name}]\n{tool_content}",
-                                    "TOOL",
-                                )
-                            )
-
-                    # Count message types
-                    user_count = len([m for m in messages_to_store if m[1] == "USER"])
-                    assistant_count = len(
-                        [m for m in messages_to_store if m[1] == "ASSISTANT"]
-                    )
-                    tool_count = len([m for m in messages_to_store if m[1] == "TOOL"])
-
-                    # Log message breakdown before storing
-                    logger.info(
-                        f"{self.name} - Message breakdown: {user_count} USER, {assistant_count} ASSISTANT, {tool_count} TOOL messages"
-                    )
-                    if tool_names:
-                        logger.info(
-                            f"{self.name} - Tools called: {', '.join(tool_names)}"
-                        )
-                    else:
-                        logger.info(f"{self.name} - No tools called")
-
-                    # Store the conversation batch
-                    success = conversation_manager.store_conversation_batch(
-                        messages=messages_to_store,
-                        user_id=user_id,
-                        session_id=state.get("session_id"),  # Use session_id from state
-                        agent_name=self.name,
-                    )
-
-                    if success:
-                        logger.info(
-                            f"{self.name} - Successfully stored {len(messages_to_store)} conversation messages"
-                        )
-                    else:
-                        logger.warning(
-                            f"{self.name} - Failed to store conversation messages"
-                        )
-
-                except Exception as e:
-                    logger.error(
-                        f"{self.name} - Error storing conversation messages: {e}",
-                        exc_info=True,
-                    )
-
-            # Process agent response for pattern extraction and memory capture
-            if user_id and agent_response:
-                try:
-                    # Check if memory hooks are available through the memory client
-                    from .memory_oss.hooks import MemoryHookProvider
-
-                    # Use the SREMemoryClient that's already imported at the top
-                    # Get region from llm_kwargs if available
-                    region = self.llm_kwargs.get("region_name", "us-east-1") if self.llm_provider == "bedrock" else "us-east-1"
-                    memory_client = SREMemoryClient(region=region)
-                    memory_hooks = MemoryHookProvider(memory_client)
-
-                    # Create response object for hooks
-                    response_obj = {
-                        "content": agent_response,
-                        "tool_calls": [
-                            {
-                                "name": getattr(msg, "name", "unknown"),
-                                "content": str(getattr(msg, "content", "")),
-                            }
-                            for msg in all_messages
-                            if hasattr(msg, "tool_call_id")
-                        ],
-                    }
-
-                    # Call on_agent_response hook to extract patterns
-                    memory_hooks.on_agent_response(
-                        agent_name=self.name, response=response_obj, state=state
-                    )
-
-                    logger.info(
-                        f"{self.name} - Processed agent response for memory pattern extraction"
-                    )
-
-                except Exception as e:
-                    logger.warning(
-                        f"{self.name} - Failed to process agent response for memory patterns: {e}"
-                    )
 
             # Update state with streaming info
             return {

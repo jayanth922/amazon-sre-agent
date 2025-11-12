@@ -17,16 +17,16 @@ logger = logging.getLogger(__name__)
 class ModelConfig(BaseModel):
     """Model configuration constants."""
 
-    # Anthropic model IDs
+    # Groq model IDs (primary provider)
+    groq_model_id: str = Field(
+        default="llama-3.3-70b-versatile",
+        description="Default Groq model ID (llama-3.3-70b-versatile or llama-3.3-70b-specdec)",
+    )
+
+    # Anthropic model IDs (alternative provider)
     anthropic_model_id: str = Field(
         default="claude-sonnet-4-20250514",
         description="Default Anthropic Claude model ID",
-    )
-
-    # Amazon Bedrock model IDs
-    bedrock_model_id: str = Field(
-        default="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
-        description="Default Amazon Bedrock Claude model ID",
     )
 
     # Model parameters
@@ -56,16 +56,6 @@ class AWSConfig(BaseModel):
     """AWS configuration constants."""
 
     default_region: str = Field(default="us-east-1", description="Default AWS region")
-
-    bedrock_endpoint_url: str = Field(
-        default="https://bedrock-agentcore-control.us-east-1.amazonaws.com",
-        description="Amazon Bedrock AgentCore control endpoint URL",
-    )
-
-    credential_provider_endpoint_url: str = Field(
-        default="https://us-east-1.prod.agent-credential-provider.cognito.aws.dev",
-        description="AWS credential provider endpoint URL",
-    )
 
 
 class TimeoutConfig(BaseModel):
@@ -170,46 +160,6 @@ class AgentMetadata(BaseModel):
     agent_type: str = Field(description="Agent type for prompt loading")
 
 
-class MemoryConfig(BaseModel):
-    """Memory system configuration constants."""
-
-    # Query constants for comprehensive memory retrieval
-    user_preferences_query: str = Field(
-        default="user settings communication escalation notification reporting workflow preferences",
-        description="Natural language query to retrieve all user preferences including communication, escalation, notification, reporting, and workflow preferences",
-    )
-
-    # Memory retrieval limits
-    max_preferences_results: int = Field(
-        default=10,
-        ge=1,
-        le=50,
-        description="Maximum number of preference memories to retrieve",
-    )
-
-    max_infrastructure_results: int = Field(
-        default=50,
-        ge=1,
-        le=100,
-        description="Maximum number of infrastructure knowledge memories to retrieve",
-    )
-
-    max_investigation_results: int = Field(
-        default=5,
-        ge=1,
-        le=20,
-        description="Maximum number of past investigation memories to retrieve",
-    )
-
-    # Content length limits for memory storage
-    max_content_length: int = Field(
-        default=9000,
-        ge=1000,
-        le=10000,
-        description="Maximum character length for conversation content stored in memory",
-    )
-
-
 class AgentsConstant(BaseModel):
     """Agent-specific constants for the SRE system."""
 
@@ -308,29 +258,27 @@ class SREConstants:
     prompts: PromptConfig = PromptConfig()
     app: ApplicationConfig = ApplicationConfig()
     agents: AgentsConstant = AgentsConstant()
-    memory: MemoryConfig = MemoryConfig()
 
     @classmethod
     def get_model_config(cls, provider: str, **kwargs) -> dict:
         """Get model configuration for a specific provider.
 
         Args:
-            provider: LLM provider ("anthropic" or "bedrock")
+            provider: LLM provider ("groq" or "anthropic")
             **kwargs: Additional configuration overrides
 
         Returns:
             Dictionary with model configuration
         """
-        if provider == "anthropic":
+        if provider == "groq":
             return {
-                "model_id": kwargs.get("model_id", cls.model.anthropic_model_id),
+                "model_id": kwargs.get("model_id", cls.model.groq_model_id),
                 "max_tokens": kwargs.get("max_tokens", cls.model.default_max_tokens),
                 "temperature": kwargs.get("temperature", cls.model.default_temperature),
             }
-        elif provider == "bedrock":
+        elif provider == "anthropic":
             return {
-                "model_id": kwargs.get("model_id", cls.model.bedrock_model_id),
-                "region_name": kwargs.get("region_name", cls.aws.default_region),
+                "model_id": kwargs.get("model_id", cls.model.anthropic_model_id),
                 "max_tokens": kwargs.get("max_tokens", cls.model.default_max_tokens),
                 "temperature": kwargs.get("temperature", cls.model.default_temperature),
             }
@@ -342,7 +290,7 @@ class SREConstants:
         """Get model configuration for output formatter.
 
         Args:
-            provider: LLM provider ("anthropic" or "bedrock")
+            provider: LLM provider ("groq" or "anthropic")
             **kwargs: Additional configuration overrides
 
         Returns:
@@ -369,8 +317,8 @@ class SREConstants:
 constants = SREConstants()
 
 # Legacy support - individual constants for backward compatibility if needed
+GROQ_MODEL_ID = constants.model.groq_model_id
 ANTHROPIC_MODEL_ID = constants.model.anthropic_model_id
-BEDROCK_MODEL_ID = constants.model.bedrock_model_id
 DEFAULT_TEMPERATURE = constants.model.default_temperature
 DEFAULT_MAX_TOKENS = constants.model.default_max_tokens
 DEFAULT_AWS_REGION = constants.aws.default_region

@@ -1,7 +1,10 @@
-# Use uv's ARM64 Python base image
-FROM --platform=linux/arm64 ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+# Use official Python image
+FROM python:3.12-slim-bookworm
 
 WORKDIR /app
+
+# Install uv
+RUN pip install --no-cache-dir uv
 
 # Copy uv files
 COPY pyproject.toml uv.lock ./

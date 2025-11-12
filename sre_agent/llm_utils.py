@@ -10,7 +10,7 @@ import logging
 from typing import Any, Dict
 
 from langchain_anthropic import ChatAnthropic
-from langchain_aws import ChatBedrock
+from langchain_groq import ChatGroq
 
 from .constants import SREConstants
 
@@ -35,11 +35,11 @@ class LLMAccessError(LLMProviderError):
     pass
 
 
-def create_llm_with_error_handling(provider: str = "bedrock", **kwargs):
+def create_llm_with_error_handling(provider: str = "groq", **kwargs):
     """Create LLM instance with proper error handling and helpful error messages.
 
     Args:
-        provider: LLM provider ("anthropic" or "bedrock")
+        provider: LLM provider ("groq" or "anthropic")
         **kwargs: Additional configuration overrides
 
     Returns:
@@ -51,9 +51,9 @@ def create_llm_with_error_handling(provider: str = "bedrock", **kwargs):
         LLMAccessError: For access/permission failures
         ValueError: For unsupported providers
     """
-    if provider not in ["anthropic", "bedrock"]:
+    if provider not in ["groq", "anthropic"]:
         raise ValueError(
-            f"Unsupported provider: {provider}. Use 'anthropic' or 'bedrock'"
+            f"Unsupported provider: {provider}. Use 'groq' or 'anthropic'"
         )
 
     logger.info(f"Creating LLM with provider: {provider}")
@@ -64,11 +64,9 @@ def create_llm_with_error_handling(provider: str = "bedrock", **kwargs):
         if provider == "anthropic":
             logger.info(f"Creating Anthropic LLM - Model: {config['model_id']}")
             return _create_anthropic_llm(config)
-        else:  # bedrock
-            logger.info(
-                f"Creating Bedrock LLM - Model: {config['model_id']}, Region: {config['region_name']}"
-            )
-            return _create_bedrock_llm(config)
+        else:  # groq
+            logger.info(f"Creating Groq LLM - Model: {config['model_id']}")
+            return _create_groq_llm(config)
 
     except Exception as e:
         error_msg = _get_helpful_error_message(provider, e)
@@ -92,15 +90,12 @@ def _create_anthropic_llm(config: Dict[str, Any]):
     )
 
 
-def _create_bedrock_llm(config: Dict[str, Any]):
-    """Create Bedrock LLM instance."""
-    return ChatBedrock(
-        model_id=config["model_id"],
-        region_name=config["region_name"],
-        model_kwargs={
-            "temperature": config["temperature"],
-            "max_tokens": config["max_tokens"],
-        },
+def _create_groq_llm(config: Dict[str, Any]):
+    """Create Groq LLM instance."""
+    return ChatGroq(
+        model=config["model_id"],
+        temperature=config["temperature"],
+        max_tokens=config["max_tokens"],
     )
 
 
@@ -149,7 +144,7 @@ def _get_helpful_error_message(provider: str, error: Exception) -> str:
                 "  1. Set ANTHROPIC_API_KEY environment variable\n"
                 "  2. Check if your API key is valid and active\n"
                 "  3. Try running: export ANTHROPIC_API_KEY='your-key-here'\n"
-                "  4. Or switch to Bedrock: sre-agent --provider bedrock"
+                "  4. Or switch to Groq: sre-agent --provider groq"
             )
         elif _is_access_error(error):
             return (
@@ -158,7 +153,7 @@ def _get_helpful_error_message(provider: str, error: Exception) -> str:
                 "  1. Check if your account has sufficient credits\n"
                 "  2. Verify your API key has the required permissions\n"
                 "  3. Check rate limits and usage quotas\n"
-                "  4. Or switch to Bedrock: sre-agent --provider bedrock"
+                "  4. Or switch to Groq: sre-agent --provider groq"
             )
         else:
             return (
@@ -167,43 +162,39 @@ def _get_helpful_error_message(provider: str, error: Exception) -> str:
                 "  1. Check your internet connection\n"
                 "  2. Verify Anthropic service status\n"
                 "  3. Try again in a few minutes\n"
-                "  4. Or switch to Bedrock: sre-agent --provider bedrock"
+                "  4. Or switch to Groq: sre-agent --provider groq"
             )
 
-    else:  # bedrock
+    else:  # groq
         if _is_auth_error(error):
             return (
-                f"Amazon Bedrock authentication failed: {base_error}\n"
+                f"Groq authentication failed: {base_error}\n"
                 "Solutions:\n"
-                "  1. Configure AWS credentials (aws configure)\n"
-                "  2. Set AWS_PROFILE environment variable\n"
-                "  3. Check IAM permissions for Bedrock access\n"
-                "  4. Verify your AWS credentials are valid\n"
-                "  5. Or switch to Anthropic: sre-agent --provider anthropic"
+                "  1. Set GROQ_API_KEY environment variable\n"
+                "  2. Check if your API key is valid and active\n"
+                "  3. Try: export GROQ_API_KEY='your-key-here'\n"
+                "  4. Or switch to Anthropic: sre-agent --provider anthropic"
             )
         elif _is_access_error(error):
             return (
-                f"Amazon Bedrock access denied: {base_error}\n"
+                f"Groq access error: {base_error}\n"
                 "Solutions:\n"
-                "  1. Enable Claude models in Bedrock console\n"
-                "  2. Request model access for your AWS account\n"
-                "  3. Check if the region supports Bedrock\n"
-                "  4. Verify IAM permissions for bedrock:InvokeModel\n"
-                "  5. Or switch to Anthropic: sre-agent --provider anthropic"
+                "  1. Verify model name exists for your account\n"
+                "  2. Check rate limits / quotas in Groq console\n"
+                "  3. Try a lighter model (e.g., llama-3.1-8b-instant)\n"
+                "  4. Or switch to Anthropic: sre-agent --provider anthropic"
             )
         else:
             return (
-                f"Amazon Bedrock provider error: {base_error}\n"
+                f"Groq provider error: {base_error}\n"
                 "Solutions:\n"
-                "  1. Check AWS service status\n"
-                "  2. Verify the region supports Bedrock\n"
-                "  3. Try a different AWS region\n"
-                "  4. Check your internet connection\n"
-                "  5. Or switch to Anthropic: sre-agent --provider anthropic"
+                "  1. Check Groq service status and your network\n"
+                "  2. Verify model name and parameters\n"
+                "  3. Try again or switch providers"
             )
 
 
-def validate_provider_access(provider: str = "bedrock", **kwargs) -> bool:
+def validate_provider_access(provider: str = "groq", **kwargs) -> bool:
     """Validate if the specified provider is accessible.
 
     Args:
@@ -230,11 +221,11 @@ def get_recommended_provider() -> str:
     Returns:
         Recommended provider name
     """
-    # Try bedrock first (default), then anthropic
-    for provider in ["bedrock", "anthropic"]:
+    # Try groq first (default), then anthropic
+    for provider in ["groq", "anthropic"]:
         if validate_provider_access(provider):
             logger.info(f"Recommended provider: {provider}")
             return provider
 
-    logger.warning("No providers are immediately accessible - defaulting to bedrock")
-    return "bedrock"
+    logger.warning("No providers are immediately accessible - defaulting to groq")
+    return "groq"

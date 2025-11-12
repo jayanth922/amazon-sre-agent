@@ -312,65 +312,51 @@ def _get_anthropic_api_key() -> str:
     return api_key
 
 
-def _read_gateway_config() -> tuple[str, str]:
-    """Read gateway URI from config and access token from environment."""
-    try:
-        # Load environment variables from sre_agent directory
-        load_dotenv(Path(__file__).parent / ".env")
-
-        # Read gateway URI and region from agent_config.yaml
-        config_path = Path(__file__).parent / "config" / "agent_config.yaml"
-        with open(config_path, "r") as f:
-            config = yaml.safe_load(f)
-
-        # Handle case where 'gateway' key might be None
-        gateway_config = config.get("gateway") or {}
-        gateway_uri = gateway_config.get("uri") if isinstance(gateway_config, dict) else None
-        if not gateway_uri:
-            raise ValueError(
-                "Gateway URI not found in agent_config.yaml under 'gateway.uri'"
-            )
-
-        # Get AWS region with fallback logic: config -> AWS_REGION env var -> us-east-1
-        # Handle case where 'aws' key might be None
-        aws_config = config.get("aws") or {}
-        aws_region = aws_config.get("region") if isinstance(aws_config, dict) else None
-        if not aws_region:
-            aws_region = os.environ.get("AWS_REGION", "us-east-1")
-
-        # Read access token from environment
-        access_token = os.getenv("GATEWAY_ACCESS_TOKEN")
-        if not access_token:
-            raise ValueError("GATEWAY_ACCESS_TOKEN environment variable is required")
-
-        return gateway_uri.rstrip("/"), access_token, aws_region
-    except Exception as e:
-        logger.error(f"Error reading gateway configuration: {e}")
-        raise
+def _get_mcp_server_uris() -> dict[str, str]:
+    """Read MCP server URIs from environment variables."""
+    # Load environment variables
+    load_dotenv(Path(__file__).parent / ".env")
+    
+    mcp_uris = {
+        "k8s": os.getenv("MCP_K8S_URI"),
+        "logs": os.getenv("MCP_LOGS_URI"),
+        "metrics": os.getenv("MCP_METRICS_URI"),
+        "runbooks": os.getenv("MCP_RUNBOOKS_URI"),
+    }
+    
+    # Filter out None values
+    mcp_uris = {k: v for k, v in mcp_uris.items() if v}
+    
+    if not mcp_uris:
+        raise ValueError(
+            "No MCP server URIs configured. Set at least one of: "
+            "MCP_K8S_URI, MCP_LOGS_URI, MCP_METRICS_URI, MCP_RUNBOOKS_URI"
+        )
+    
+    logger.info(f"Configured MCP servers: {list(mcp_uris.keys())}")
+    return mcp_uris
 
 
 def create_mcp_client() -> MultiServerMCPClient:
-    """Create and return MultiServerMCPClient with gateway configuration."""
-    gateway_uri, access_token, _ = _read_gateway_config()  # Region not needed here
-
-    # Configure MCP server connection
-    client = MultiServerMCPClient(
-        {
-            "gateway": {
-                "url": f"{gateway_uri}/mcp",
-                "transport": "streamable_http",
-                "headers": {"Authorization": f"Bearer {access_token}"},
-            }
+    """Create and return MultiServerMCPClient with HTTP transport for each domain."""
+    mcp_uris = _get_mcp_server_uris()
+    
+    # Configure MCP server connections (one per domain)
+    server_config = {}
+    for name, uri in mcp_uris.items():
+        server_config[name] = {
+            "url": uri,
+            "transport": "streamable_http",
+            # No authentication required for in-cluster communication
         }
-    )
-
+    
+    client = MultiServerMCPClient(server_config)
     return client
 
 
 async def create_multi_agent_system(
-    provider: str = "bedrock",
+    provider: str = "groq",
     checkpointer=None,
-    force_delete_memory: bool = False,
     export_graph: bool = False,
     graph_output_path: str = "./docs/sre_agent_architecture.md",
     region_name: str = None,
@@ -383,10 +369,9 @@ async def create_multi_agent_system(
     if provider == "anthropic" and not llm_kwargs.get("api_key"):
         llm_kwargs["api_key"] = _get_anthropic_api_key()
 
-    # Add region_name to llm_kwargs for bedrock provider
-    if provider == "bedrock" and region_name:
-        llm_kwargs["region_name"] = region_name
-        logger.info(f"Using AWS region for Bedrock: {region_name}")
+    # Region name is only used for AWS services (not for LLM provider anymore)
+    if region_name:
+        logger.info(f"Using AWS region for gateway and observability: {region_name}")
 
     # Create MCP client and get tools with retry logic
     mcp_tools = []
@@ -457,31 +442,8 @@ async def create_multi_agent_system(
     # Combine local tools with MCP tools
     local_tools = [get_current_time]
 
-    # Add memory tools if memory system is enabled
+    # Memory tools removed
     memory_tools = []
-    try:
-        from .memory_oss.client_postgres import SREMemoryClient
-        from .memory_oss.config import _load_memory_config
-        from .memory_oss.tools import create_memory_tools
-
-        memory_config = _load_memory_config()
-        if memory_config.enabled:
-            logger.debug("Adding memory tools to agent tool list")
-            # Use the region from parameter if provided, otherwise use config default
-            memory_region = region_name if region_name else memory_config.region
-            memory_client = SREMemoryClient(
-                memory_name=memory_config.memory_name,
-                region=memory_region,
-                force_delete=force_delete_memory,
-            )
-            logger.info(f"Using AWS region for memory: {memory_region}")
-            memory_tools = create_memory_tools(memory_client)
-            logger.info(f"Added {len(memory_tools)} memory tools to agent tool list")
-        else:
-            logger.info("Memory system disabled - no memory tools added")
-    except Exception as e:
-        logger.warning(f"Failed to add memory tools: {e}")
-        memory_tools = []
 
     all_tools = local_tools + mcp_tools + memory_tools
 
@@ -489,12 +451,9 @@ async def create_multi_agent_system(
     logger.info(f"Total tools being passed to agents: {len(all_tools)}")
     logger.info(f"  - Local tools: {len(local_tools)}")
     logger.info(f"  - MCP tools: {len(mcp_tools)}")
-    logger.info(f"  - Memory tools: {len(memory_tools)}")
 
-    # Log detailed memory tool information
-    if memory_tools:
-        logger.info("Memory tools details:")
-        for tool in memory_tools:
+    # Memory tool logging removed
+    if False:
             logger.info(f"    Tool: {getattr(tool, 'name', 'unknown')}")
             logger.info(
                 f"      Description: {getattr(tool, 'description', 'No description')}"
@@ -574,7 +533,6 @@ async def create_multi_agent_system(
     graph = build_multi_agent_graph(
         tools=all_tools,
         llm_provider=provider,
-        force_delete_memory=force_delete_memory,
         export_graph=export_graph,
         graph_output_path=graph_output_path,
         **llm_kwargs,
@@ -651,7 +609,6 @@ async def _run_interactive_session(
     save_state: bool = True,
     output_dir: str = "./reports",
     save_markdown: bool = True,
-    force_delete_memory: bool = False,
     region_name: str = "us-east-1",
 ):
     """Run an interactive multi-turn conversation session."""
@@ -687,7 +644,6 @@ async def _run_interactive_session(
     # Create multi-agent system
     graph, all_tools = await create_multi_agent_system(
         provider,
-        force_delete_memory=force_delete_memory,
         export_graph=False,  # Don't export in interactive mode each time
         region_name=region_name,
     )
@@ -1108,9 +1064,9 @@ async def main():
     )
     parser.add_argument(
         "--provider",
-        choices=["bedrock", "anthropic"],
-        default="bedrock",
-        help="Model provider to use (default: bedrock)",
+        choices=["groq", "anthropic"],
+        default="groq",
+        help="Model provider to use (default: groq)",
     )
     parser.add_argument(
         "--debug",
@@ -1141,11 +1097,6 @@ async def main():
         "--no-markdown",
         action="store_true",
         help="Disable saving final responses to markdown files",
-    )
-    parser.add_argument(
-        "--force-delete-memory",
-        action="store_true",
-        help="Force delete and recreate the memory system (WARNING: This will delete all saved memories)",
     )
     parser.add_argument(
         "--export-graph",
@@ -1209,7 +1160,6 @@ async def main():
                 print(f"\n📊 Exporting agent architecture to {args.graph_output}...")
                 await create_multi_agent_system(
                     provider=args.provider,
-                    force_delete_memory=args.force_delete_memory,
                     export_graph=True,
                     graph_output_path=args.graph_output,
                     region_name=aws_region,
@@ -1220,7 +1170,6 @@ async def main():
                 save_state=not args.no_save,
                 output_dir=args.output_dir,
                 save_markdown=not args.no_markdown,
-                force_delete_memory=args.force_delete_memory,
                 region_name=aws_region,
             )
         # Single prompt mode
@@ -1228,7 +1177,6 @@ async def main():
             try:
                 graph, all_tools = await create_multi_agent_system(
                     args.provider,
-                    force_delete_memory=args.force_delete_memory,
                     export_graph=args.export_graph,
                     graph_output_path=args.graph_output,
                     region_name=aws_region,
@@ -1248,7 +1196,7 @@ async def main():
                     print(str(e))
                     print("\n💡 Quick fix: Try running with the other provider:")
                     other_provider = (
-                        "anthropic" if args.provider == "bedrock" else "bedrock"
+                        "anthropic" if args.provider == "groq" else "groq"
                     )
                     print(
                         f'   sre-agent --provider {other_provider} --prompt "your query"'

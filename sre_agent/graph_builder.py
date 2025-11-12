@@ -88,8 +88,7 @@ async def _prepare_initial_state(state: AgentState) -> Dict[str, Any]:
 
 def build_multi_agent_graph(
     tools: List[BaseTool],
-    llm_provider: str = "bedrock",
-    force_delete_memory: bool = False,
+    llm_provider: str = "groq",
     export_graph: bool = False,
     graph_output_path: str = "./docs/sre_agent_architecture.md",
     **llm_kwargs,
@@ -99,7 +98,6 @@ def build_multi_agent_graph(
     Args:
         tools: List of all available tools
         llm_provider: LLM provider to use
-        force_delete_memory: Whether to force delete existing memory
         export_graph: Whether to export the graph as a Mermaid diagram
         graph_output_path: Path to save the exported Mermaid diagram (default: ./docs/sre_agent_architecture.md)
         **llm_kwargs: Additional arguments for LLM
@@ -114,7 +112,7 @@ def build_multi_agent_graph(
 
     # Create supervisor
     supervisor = SupervisorAgent(
-        llm_provider=llm_provider, force_delete_memory=force_delete_memory, **llm_kwargs
+        llm_provider=llm_provider, **llm_kwargs
     )
 
     # Create agent nodes with filtered tools and metadata from constants

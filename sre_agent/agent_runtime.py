@@ -71,13 +71,13 @@ async def initialize_agent():
     try:
         logger.info("Initializing SRE Agent system...")
 
-        # Get provider from environment variable with bedrock as default
-        provider = os.getenv("LLM_PROVIDER", "bedrock").lower()
+        # Get provider from environment variable with groq as default
+        provider = os.getenv("LLM_PROVIDER", "groq").lower()
 
         # Validate provider
-        if provider not in ["anthropic", "bedrock"]:
-            logger.warning(f"Invalid provider '{provider}', defaulting to 'bedrock'")
-            provider = "bedrock"
+        if provider not in ["groq", "anthropic"]:
+            logger.warning(f"Invalid provider '{provider}', defaulting to 'groq'")
+            provider = "groq"
 
         logger.info(f"Environment LLM_PROVIDER: {os.getenv('LLM_PROVIDER', 'NOT_SET')}")
         logger.info(f"Using LLM provider: {provider}")
@@ -98,7 +98,7 @@ async def initialize_agent():
             print(f"\n❌ {type(e).__name__}:")
             print(str(e))
             print("\n💡 Set LLM_PROVIDER environment variable to switch providers:")
-            other_provider = "anthropic" if provider == "bedrock" else "bedrock"
+            other_provider = "anthropic" if provider == "groq" else "groq"
             print(f"   export LLM_PROVIDER={other_provider}")
         else:
             logger.error(f"Failed to initialize SRE Agent system: {e}")
@@ -221,13 +221,13 @@ async def ping():
     return {"status": "healthy"}
 
 
-async def invoke_sre_agent_async(prompt: str, provider: str = "anthropic") -> str:
+async def invoke_sre_agent_async(prompt: str, provider: str = "groq") -> str:
     """
     Programmatic interface to invoke SRE agent.
 
     Args:
         prompt: The user prompt/query
-        provider: LLM provider ("anthropic" or "bedrock")
+        provider: LLM provider ("groq" or "anthropic")
 
     Returns:
         The agent's response as a string
@@ -262,13 +262,13 @@ async def invoke_sre_agent_async(prompt: str, provider: str = "anthropic") -> st
         raise
 
 
-def invoke_sre_agent(prompt: str, provider: str = "anthropic") -> str:
+def invoke_sre_agent(prompt: str, provider: str = "groq") -> str:
     """
     Synchronous wrapper for invoke_sre_agent_async.
 
     Args:
         prompt: The user prompt/query
-        provider: LLM provider ("anthropic" or "bedrock")
+        provider: LLM provider ("groq" or "anthropic")
 
     Returns:
         The agent's response as a string
@@ -284,9 +284,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SRE Agent Runtime")
     parser.add_argument(
         "--provider",
-        choices=["anthropic", "bedrock"],
-        default=os.getenv("LLM_PROVIDER", "bedrock"),
-        help="LLM provider to use (default: bedrock)",
+        choices=["groq", "anthropic"],
+        default=os.getenv("LLM_PROVIDER", "groq"),
+        help="LLM provider to use (default: groq)",
     )
     parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
     parser.add_argument("--port", type=int, default=8080, help="Port to bind to")

@@ -43,14 +43,10 @@ agents:
       - get_common_resolutions
 
 # Global tools available to all agents
-global_tools:
-  - x-amz-bedrock-agentcore-search  # Universal search tool
+# Tools are now discovered from MCP servers (K8s, Logs, Metrics, Runbooks)
+global_tools: []
 
-# AWS Configuration
+# AWS Configuration (for in-cluster AWS API access if needed)
 aws:
-  # region: "us-east-1"  # AWS region for Bedrock models and memory storage (uncomment to override)
-
-# Gateway configuration
-gateway:
-  uri: "https://sre-gateway-i7ge1zayhw.gateway.bedrock-agentcore.us-east-1.amazonaws.com"
+  # region: "us-east-1"  # AWS region (uncomment to override)
 
