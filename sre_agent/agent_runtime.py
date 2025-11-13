@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel
@@ -45,6 +46,15 @@ logger = logging.getLogger(__name__)
 
 # Simple FastAPI app
 app = FastAPI(title="SRE Agent Runtime", version="1.0.0")
+
+# Add CORS middleware to allow requests from web UI
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins in development
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # Simple request/response models
