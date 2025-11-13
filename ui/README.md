@@ -79,7 +79,45 @@ python3 -m http.server 3000
 
 ---
 
-## Screenshots
+## UI Wireframes & Screenshots
+
+### Welcome Screen
+The UI welcomes users with quick action chips for common SRE queries:
+
+![Welcome Screen](sre_wireframe_welcome.svg)
+
+**Features:**
+- Clean welcome interface
+- Quick action chips (Pod Security, Troubleshooting, Monitoring, Runbooks)
+- Sidebar with settings and actions
+- Provider selection (Groq, Anthropic, Bedrock)
+
+### Investigation Results - Pod Security
+Example investigation showing structured results with executive summary:
+
+![Pod Security Results](sre_wireframe_results_pod_security.svg)
+
+**Features:**
+- User query displayed at top
+- Structured markdown results
+- Executive Summary section
+- Key Insights and Findings
+- Next Steps recommendations
+
+### Investigation Results - Runbooks
+Example showing how runbook queries are displayed:
+
+![Runbooks Results](sre_wireframe_results_runbooks.svg)
+
+**Features:**
+- Clean results layout
+- Markdown formatting
+- Scrollable content area
+- Fixed input bar at bottom
+
+---
+
+## Implementation Details
 
 ### Swagger UI (Option 1)
 - API endpoint testing
@@ -96,6 +134,7 @@ python3 -m http.server 3000
 - Real-time responses
 - Example queries
 - Mobile-friendly
+- Implements the wireframe designs shown above
 
 ---
 
